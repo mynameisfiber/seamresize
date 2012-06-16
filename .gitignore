@@ -1,0 +1,4 @@
+*.jpg
+*.sw[po]
+.DS_Store
+*.pyc
