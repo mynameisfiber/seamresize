@@ -58,21 +58,41 @@ def remove_path(image, path):
     image[zip(*path)] = -1
     return image[image>=0].reshape((im_w, im_h-len(path)//im_w, im_c))
 
+def stretch_path(image, paths):
+    print "Stretching Path"
+    im_w, im_h, im_c = image.shape
+    image_new = np.concatenate((image, np.zeros((im_w,len(paths)//im_w, im_c))), axis=1)
+    for x, y in paths:
+        # This statement deals with if we have already made changes in this row
+        y_orig = y
+        while np.any(image[x,y_orig] != image_new[x,y]):
+            y += 1
+        interpolated = (np.sum(image_new[x,y-1:y+2], axis=0)+np.sum(image_new[x-1:x+2,y], axis=0))/6.
+        image_new[x,:,:] = np.vstack((image_new[x,:y], interpolated.reshape((1,3)), image_new[x, y:-1]))
+    return image_new
+
 def resize(image, dim):
     print "Resizing"
     while True:
-        if dim[1] < image.shape[1]:
+        if dim[1] != image.shape[1]:
             virtical_seams = find_seams(cost(image.sum(axis=-1)/3.))
             print "Found %d vert seams"%len(virtical_seams)
-            num_needed = image.shape[1]-dim[1]
+            num_needed = abs(image.shape[1]-dim[1])
             allpaths = reduce(lambda a,b : a+b, (seam["path"] for seam in virtical_seams[:num_needed]))
-            image = remove_path(image, allpaths)
+            if dim[1] < image.shape[1]:
+                image = remove_path(image, allpaths)
+            else:
+                image = stretch_path(image, allpaths)
+
         elif dim[0] < image.shape[0]:
             horizontal_seams = find_seams(cost((image.sum(axis=-1)/3.).T))
             print "Found %d horiz seams"%len(horizontal_seams)
-            num_needed = image.shape[0]-dim[0]
+            num_needed = abs(image.shape[0]-dim[0])
             allpaths = reduce(lambda a,b : a+b, (seam["path"] for seam in horizontal_seams[:num_needed]))
-            image = remove_path(image.swapaxes(0,1), allpaths).swapaxes(0,1)
+            if dim[0] < image.shape[0]:
+                image = remove_path(image.swapaxes(0,1), allpaths).swapaxes(0,1)
+            else:
+                image = stretch_path(image.swapaxes(0,1), allpaths).swapaxes(0,1)
         else:
             break
 
