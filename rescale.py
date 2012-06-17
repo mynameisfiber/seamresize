@@ -1,13 +1,13 @@
 #!/bin/env python
 
 import numpy as np
-from scipy.ndimage.filters import sobel 
+from scipy.ndimage.filters import laplace 
 from PIL import Image
 
 import sys
 
 def cost(image):
-    return sobel(image)**2
+    return laplace(image)**2
 
 def find_seams(image):
     print "Finding seams"
@@ -73,28 +73,31 @@ def stretch_path(image, paths):
 
 def resize(image, dim):
     print "Resizing"
-    while True:
+    todo = [True, True]
+    while any(todo):
         if dim[1] != image.shape[1]:
             virtical_seams = find_seams(cost(image.sum(axis=-1)/3.))
-            print "Found %d vert seams"%len(virtical_seams)
             num_needed = abs(image.shape[1]-dim[1])
+            print "Found %d vert seams (%d more)"%(len(virtical_seams), num_needed)
             allpaths = reduce(lambda a,b : a+b, (seam["path"] for seam in virtical_seams[:num_needed]))
             if dim[1] < image.shape[1]:
                 image = remove_path(image, allpaths)
             else:
                 image = stretch_path(image, allpaths)
+        else:
+            todo[1] = False
 
-        elif dim[0] < image.shape[0]:
+        if dim[0] != image.shape[0]:
             horizontal_seams = find_seams(cost((image.sum(axis=-1)/3.).T))
-            print "Found %d horiz seams"%len(horizontal_seams)
             num_needed = abs(image.shape[0]-dim[0])
+            print "Found %d horiz seams (%d more)"%(len(horizontal_seams), num_needed)
             allpaths = reduce(lambda a,b : a+b, (seam["path"] for seam in horizontal_seams[:num_needed]))
             if dim[0] < image.shape[0]:
                 image = remove_path(image.swapaxes(0,1), allpaths).swapaxes(0,1)
             else:
                 image = stretch_path(image.swapaxes(0,1), allpaths).swapaxes(0,1)
         else:
-            break
+            todo[0] = False
 
     Image.fromarray(image.astype('uint8')).save("out.png")
 
